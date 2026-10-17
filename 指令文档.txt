@@ -1,0 +1,101 @@
+
+//读取帧头
+./xdma_rw.exe user read 0x0 -l 4
+
+//配置控制寄存器
+./xdma_rw.exe user write 0x4 0x3
+
+//读CRC
+./xdma_rw.exe user read 0x14 -l 4
+
+
+./xdma_rw.exe user read 0x3C -l 4
+
+./xdma_rw.exe user write 0x08 -l 4 0x00 0x10 0x00 0x00    # frame_len=4096, rate_div=0, data_mode=0
+./xdma_rw.exe user read  0x08 -l 4                  # 应回读 00 10 00 00  ← mode_cfg 通了的证据
+./xdma_rw.exe user write 0x04 0x11                  # clr+start
+./xdma_rw.exe user read  0x3C -l 4                  # TX_COUNT 应「连续增长」← 这次修复的直接证据
+./xdma_rw.exe user write 0x04 0x00                  # stop
+
+
+./xdma_rw.exe user write 0x04 0x12
+./xdma_rw.exe user write 0x04 0x02
+./xdma_rw.exe user write 0x04 0x03
+
+
+./xdma_rw.exe user read  0x04 -l 4
+
+./xdma_rw.exe c2h_0 read 0x0 -l 4194304 -f cap2.bin 
+
+
+
+cd G:\workbuddy\PCIE四种架构性能测试
+python pcie_bench.py regs
+python pcie_bench.py tc01 --frame-len 4096 --seconds 10 --csv tc01_4k.csv
+python pcie_bench.py tc01 --frame-len 100  --seconds 5  --csv tc01_100b.csv
+python pcie_bench.py tc01 --frame-len 4092 --seconds 10 --csv tc01_4060.csv
+
+
+python pcie_bench.py tc01 --frame-len 4060 --seconds 30 --csv tc01_4060.csv
+python pcie_bench.py tc01 --frame-len 4096 --seconds 30 --csv tc01_4096.csv
+python pcie_bench.py tc01 --frame-len 4092 --seconds 30 --csv tc01_4092.csv
+
+
+python pcie_bench.py tc01 --frame-len 4060 --chunk 524288 --seconds 30 --csv tc01_4060.csv
+python pcie_bench.py tc01 --frame-len 4096 --chunk 524288 --seconds 30 
+
+
+python pcie_bench.py tc04 --sizes 64,256,1024,4096,8192,16332 --iters 2000 --mode poll --csv tc04_poll.csv
+
+python pcie_bench.py tc04 --sizes 64,256,1024,4096,8192,16332 --iters 2000 --mode wait --csv tc04_wait.csv
+
+
+
+
+
+
+
+
+python pcie_bench.py tc04 --sizes 64 --iters 2000 --mode wait --csv tc04_wait64.csv
+
+
+python pcie_bench.py tc04 --sizes 64,256,1024,4096,8192,16332 --iters 2000 --mode wait --csv tc04_wait.csv
+python pcie_bench.py tc04 --sizes 64,256,1024,4096,8192,16332 --iters 2000 --mode poll --csv tc04_poll.csv
+
+
+python pcie_bench.py tc04 --sizes 64 --iters 2000 --mode wait 
+python pcie_bench.py tc04 --sizes 1024 --iters 2000 --mode wait
+
+python pcie_bench.py tc04 --sizes 64 --iters 2000 --mode poll --csv tc04_poll_64.csv
+python pcie_bench.py tc04 --sizes 1024 --iters 2000 --mode poll --csv tc04_poll_1024.csv
+
+python pcie_bench.py tc04 --sizes 64,1024 --iters 500 --mode wait --csv tc04_check.csv
+
+
+python pcie_bench.py tc03 --frame-len 4060 --minutes 1 --segment-min 0.5 --csv tc03_smoke.csv
+python pcie_bench.py tc03 --frame-len 4060 --minutes 30 --segment-min 5 --csv tc03_rerun.csv
+
+
+$py = "C:\Users\haido\.workbuddy\binaries\python\envs\default\Scripts\python.exe"
+& $py pcie_bench.py tc03 --frame-len 4060 --minutes 30 --segment-min 5 --csv tc03_rerun.csv
+
+python pcie_bench.py tc03 --frame-len 4060 --minutes 10 --segment-min 2 --csv tc03_power.csv
+
+python pcie_bench.py tc03 --frame-len 4060 --minutes 10 --segment-min 2 --csv tc03_default.csv
+
+
+
+
+
+$py = "C:\Users\haido\.workbuddy\binaries\python\envs\default\Scripts\python.exe"
+
+# ① 钉到 4200 MHz 的核（本机 = 核 1）—— 期望 ~61 µs / 66 MB/s
+python pcie_bench.py tc03 --affinity 1 --frame-len 4060 --minutes 10 --segment-min 2 --csv tc03_aff_c1.csv
+
+# ② 钉到 3600 MHz 的核（本机 = 核 3）—— 期望 ~70 µs / 57 MB/s
+python pcie_bench.py tc03 --affinity 3 --frame-len 4060 --minutes 10 --segment-min 2 --csv tc03_aff_c3.csv
+
+
+C：拆成三篇，需要开篇，还应该加上这个架构的环境搭建，最好把每个模块的功能都讲一下，数据流向和控制流向。总之就是越详细越好，把读者当小学生对待。每一项指标的测量方法，不然读者不知道怎么得到的数据。另外就是标题，最好直白一点，每个标题前面都加上PCIe XX架构，如《PCIe AXI stream架构： PCIe XDMA 吞吐只有 133 MB/s？》，这样读者一目了然。尽量少用一些陌生的术语，像“油门实验”这种我完全不知道是啥，多用一些FPGA领域常用的术语。G:\workbuddy\PCIE四种架构性能测试\fig，你要的图片都在这个路径里面。
+
+
